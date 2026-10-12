@@ -1,30 +1,33 @@
+version: '3.8'
+
 services:
-
-  app:
-    image: ${ECR_REGISTRY}/spring-petclinic:latest
-    ports:
-      - "8080:8080"
-    depends_on:
-      - mysql
-
-  mysql:
-    image: mysql:9.7
+  db:
+    image: mysql:8.0
+    container_name: petclinic-db
+    restart: always
+    environment:
+      - MYSQL_DATABASE=petclinic
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     ports:
       - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ""
-      MYSQL_ALLOW_EMPTY_PASSWORD: "true"
-      MYSQL_USER: petclinic
-      MYSQL_PASSWORD: petclinic
-      MYSQL_DATABASE: petclinic
-    volumes:
-      - "./conf.d:/etc/mysql/conf.d:ro"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  postgres:
-    image: postgres:18.4
+  app:
+    image: ${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}
+    container_name: petclinic-app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
-      - "5432:5432"
+      - "80:8080"
     environment:
-      POSTGRES_PASSWORD: petclinic
-      POSTGRES_USER: petclinic
-      POSTGRES_DB: petclinic
+      - SPRING_PROFILES_ACTIVE=mysql
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/petclinic?useUnicode=true&characterEncoding=utf8&useSSL=false
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - SPRING_SQL_INIT_MODE=always
